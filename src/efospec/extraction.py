@@ -257,7 +257,7 @@ def extract_spectra(data, waveair, detector, *, exposure_time, read_noise,
             # neighbour and veto every sky band. Bootstrap with finite bands,
             # then find sources again before choosing the final sampling bands.
             # This provisional model never becomes the delivered background.
-            from .local_sky import fit_background
+            from .local_sky import preliminary_background
             initial_found = [{'window_pixel':float(s.SPAT_PIXPOS),
                               'fwhm_pixels':float(np.nanmedian(s.FWHM))} for s in found]
             # Test the initial detections against the full calibrated frame.
@@ -282,10 +282,9 @@ def extract_spectra(data, waveair, detector, *, exposure_time, read_noise,
             seed_trace=primary.TRACE_SPAT
             seed_radius=max(15.,1.5*float(np.nanmedian(primary.FWHM)))
             try:
-                seed_mask,_=nearby_mask(data.shape,seed_trace,radius=seed_radius,
-                    fwhm=float(np.nanmedian(primary.FWHM)),width_pixels=30,max_gap_pixels=60)
-                seed=fit_background(data,np.where(sci.select_flag(invert=True),sci.ivar,0.),tilts,seed_mask,
-                    seed_trace,radius=seed_radius,degree=2,sigma_clip=4.)
+                seed_mask,seed=preliminary_background(data,
+                    np.where(sci.select_flag(invert=True),sci.ivar,0.),tilts,seed_trace,
+                    radius=seed_radius,fwhm=float(np.nanmedian(primary.FWHM)))
                 # A polynomial sky model is only constrained between its
                 # sampling bands. Never detect neighbours in its extrapolation.
                 x=np.arange(nx)[None,:]
@@ -336,6 +335,7 @@ def extract_spectra(data, waveair, detector, *, exposure_time, read_noise,
                     radius=background_radius,fwhm=fwhm,neighbours=neighbours,
                     allowed_mask=sci.select_flag(invert=True),max_gap_pixels=60,sigma_clip=4.)
             except BackgroundSupportError as exc:
+                exc.diagnostics['preliminary_detection_background']=seed['summary']
                 save_detection_failure(exc,found,np.zeros_like(data))
                 raise
             finder.initial_skymask=sky_input_mask

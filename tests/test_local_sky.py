@@ -17,6 +17,46 @@ def test_nearest_short_clean_run_wins_over_distant_full_width():
     assert np.all(side_counts(mask,trace,7.)>=15)
 
 
+def test_preliminary_background_narrows_without_changing_source_guard():
+    from efospec.local_sky import preliminary_background
+    y,x=np.indices((100,121));trace=np.full(100,60.)
+    sky=200.+.2*x+.005*x*x
+    ivar=np.full(sky.shape,.01);tilts=y/99.
+    mask,fit=preliminary_background(sky,ivar,tilts,trace,radius=40.,fwhm=4.)
+    assert fit['summary']['selected_width_spatial_pixels']==15
+    assert [t['status'] for t in fit['summary']['width_trials']]==['geometry_unavailable']*3+['fitted']
+    assert not np.any(mask & (abs(x-trace[:,None])<=40.5))
+    assert np.all(fit['valid_rows']) and np.all(side_counts(mask,trace,40.)==15)
+
+
+def test_preliminary_background_records_all_widths_when_neither_side_fits():
+    from efospec.local_sky import preliminary_background
+    y,x=np.indices((100,101));trace=np.full(100,50.)
+    with pytest.raises(BackgroundSupportError) as caught:
+        preliminary_background(np.full(x.shape,200.),np.ones(x.shape),y/99.,trace,radius=40.,fwhm=4.)
+    assert [t['width_spatial_pixels'] for t in caught.value.diagnostics['trials']]==[30,25,20,15]
+    assert all(t['status']=='geometry_unavailable' for t in caught.value.diagnostics['trials'])
+
+
+def test_distant_background_is_reported_as_geometry_failure():
+    from efospec.local_sky import select_bounded_background
+    y,x=np.indices((100,301));trace=np.full(100,150.)
+    with pytest.raises(BackgroundSupportError) as caught:
+        select_bounded_background(np.full(x.shape,200.),np.ones(x.shape),y/99.,trace,
+            radius=7.,fwhm=72.,widths=(15,),degrees=(2,))
+    assert all(t['status']=='geometry_unavailable' for t in caught.value.diagnostics['trials'])
+    assert any('too far' in t['reason'] for t in caught.value.diagnostics['trials'])
+
+
+def test_preliminary_narrowing_never_accepts_missing_pixel_support():
+    from efospec.local_sky import preliminary_background
+    y,x=np.indices((100,201));trace=np.full(100,100.)
+    with pytest.raises(BackgroundSupportError) as caught:
+        preliminary_background(np.full(x.shape,200.),np.zeros(x.shape),y/99.,trace,radius=15.,fwhm=4.)
+    assert len(caught.value.diagnostics['trials'])==4
+    assert all(t['status']=='fit_failed' for t in caught.value.diagnostics['trials'])
+
+
 def test_closest_bands_follow_curvature_and_fail_if_one_side_crowded():
     from efospec.local_sky import closest_mask
     trace=95+3*np.sin(np.arange(100)/25.)

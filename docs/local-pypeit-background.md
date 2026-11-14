@@ -156,3 +156,14 @@ pixel. Saved fitting masks therefore contain holes without displaced band edges.
 Existing two-sided support and rejection checks remain active; unsupported rows
 cannot become valid by moving their bands elsewhere. Explicit legacy recipe
 exclusions retain their existing geometry semantics.
+
+## Flexible preliminary sampling
+
+The provisional fit used before source finding tries 30, 25, 20 and 15 pixels
+per side, recording geometry and fit failures. It is never the delivered sky
+model. If none fit geometrically, the native route may try a wider calibrated
+window. The final selector retains its 15–50-pixel alternatives and measured
+spatial-degree comparisons where independent background support exists.
+Distance, source/neighbour guards and two-sided support remain requirements;
+wavy backgrounds are not grounds for a one-sided or full-detector fallback.
+Distance violations are classified as geometry failures before the solver runs.

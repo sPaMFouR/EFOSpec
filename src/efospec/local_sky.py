@@ -148,6 +148,32 @@ def nearby_mask(shape, trace, *, radius, fwhm, width_pixels, neighbours=(),
     return mask, bounds
 
 
+def preliminary_background(data, ivar, tilts, trace, *, radius, fwhm):
+    """Bootstrap source finding with bounded bands, narrowing before giving up.
+
+    This provisional quadratic fit is never the delivered background. The
+    final selector still measures width/degree alternatives after source finding.
+    """
+    trials=[]
+    for width in (30,25,20,15):
+        try:
+            mask,_=nearby_mask(np.shape(data),trace,radius=radius,fwhm=fwhm,
+                               width_pixels=width,max_gap_pixels=60)
+        except BackgroundSupportError as exc:
+            trials.append(dict(width_spatial_pixels=width,status='geometry_unavailable',reason=str(exc)))
+            continue
+        try:
+            fit=fit_background(data,ivar,tilts,mask,trace,radius=radius,degree=2,sigma_clip=4.)
+        except BackgroundSupportError as exc:
+            trials.append(dict(width_spatial_pixels=width,status='fit_failed',reason=str(exc)))
+            continue
+        trials.append(dict(width_spatial_pixels=width,status='fitted'))
+        fit['summary'].update(selected_width_spatial_pixels=width,width_trials=trials)
+        return mask,fit
+    raise BackgroundSupportError('Preliminary background failed with 30, 25, 20 and 15-pixel two-sided bands.',
+        phase='preliminary_source_detection',trials=trials)
+
+
 def exposure_sky_inputs(exposure, recipe):
     """Translate a hash-bound recipe into a trace-following local selection.
 
@@ -416,6 +442,10 @@ def select_bounded_background(data, ivar, tilts, trace, *, radius, fwhm, neighbo
                 masks[key] = nearby_mask(data.shape, trace, radius=float(inner), fwhm=fwhm,
                     width_pixels=int(width), neighbours=neighbours,
                     max_gap_pixels=max_gap_pixels)[0]
+                # Distance/source-overlap failures are geometry failures too.
+                # Classify before fitting so native window expansion can try
+                # more calibrated room without relaxing any support gate.
+                validate_bounded_mask(masks[key], trace, radius)
             except BackgroundSupportError as exc:
                 masks[key] = None
                 trials.append(dict(width_spatial_pixels=int(width), spatial_degree=None,
