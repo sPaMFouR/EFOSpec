@@ -393,6 +393,13 @@ def select_bounded_background(data, ivar, tilts, trace, *, radius, fwhm, neighbo
         raise ValueError('the withheld ring must be at least two pixels wide')
     if not np.isfinite(improvement_sigma) or improvement_sigma <= 0:
         raise ValueError('the required improvement must be positive')
+    # Detector defects remove fitting samples, not geometric band locations.
+    # Keep source/neighbour guards in nearby_mask; retain holes in the actual
+    # fit mask and let fit_background enforce two-sided support per row.
+    if allowed_mask is not None:
+        if np.shape(allowed_mask) != np.shape(data):
+            raise ValueError('allowed background mask has the wrong shape')
+        ivar = np.where(np.asarray(allowed_mask, bool), ivar, 0.)
     finite = np.isfinite(ivar) & (ivar > 0)
     if not finite.any():
         raise BackgroundSupportError('No pixel carries a usable inverse variance.')
@@ -408,7 +415,7 @@ def select_bounded_background(data, ivar, tilts, trace, *, radius, fwhm, neighbo
             try:
                 masks[key] = nearby_mask(data.shape, trace, radius=float(inner), fwhm=fwhm,
                     width_pixels=int(width), neighbours=neighbours,
-                    allowed_mask=allowed_mask, max_gap_pixels=max_gap_pixels)[0]
+                    max_gap_pixels=max_gap_pixels)[0]
             except BackgroundSupportError as exc:
                 masks[key] = None
                 trials.append(dict(width_spatial_pixels=int(width), spatial_degree=None,

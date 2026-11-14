@@ -76,6 +76,22 @@ def curved_background():
     return data, variance, tilts, mask, trace, true_sky
 
 
+def test_detector_defects_leave_holes_without_relocating_background_bands():
+    from efospec.local_sky import select_bounded_background
+    data, variance, tilts, _, trace, _ = curved_background()
+    allowed=np.ones(data.shape,bool)
+    allowed[30:33,60:70]=False
+    allowed[90:93,105:115]=False
+    mask,fit,selection=select_bounded_background(data,1/variance,tilts,trace,
+        radius=7.,fwhm=4.,allowed_mask=allowed,widths=(25,),degrees=(2,))
+    expected,_=nearby_mask(data.shape,trace,
+        radius=selection['selected_inner_edge_spatial_pixels'],fwhm=4.,width_pixels=25)
+    np.testing.assert_array_equal(mask,expected)
+    assert not np.any(fit['input_mask'] & ~allowed)
+    assert not np.any(fit['accepted_mask'] & ~allowed)
+    assert np.all(fit['side_counts'][:,fit['valid_rows']]>=5)
+
+
 def test_quadratic_pypeit_model_recovers_curved_background_and_rejects_cosmic():
     data, variance, tilts, mask, trace, truth = curved_background()
     fit = fit_background(data, 1/variance, tilts, mask, trace, radius=7., degree=2)

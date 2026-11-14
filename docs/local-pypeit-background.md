@@ -146,3 +146,13 @@ References: [PypeIt 1.14 sky subtraction](https://pypeit.readthedocs.io/en/1.14.
 and the installed 1.14.0 `pypeit/core/skysub.py` and `core/fitting.py` source.
 The adapter calls the underlying solver directly to retain its rejection mask
 and convergence status, which `global_skysub` does not return.
+
+## Detector masks and smooth band geometry
+
+Automatic finite bands follow the source trace and avoid neighbouring sources.
+Detector validity is applied through zero inverse variance after choosing those
+bands, rather than searching for a replacement contiguous band around each bad
+pixel. Saved fitting masks therefore contain holes without displaced band edges.
+Existing two-sided support and rejection checks remain active; unsupported rows
+cannot become valid by moving their bands elsewhere. Explicit legacy recipe
+exclusions retain their existing geometry semantics.
