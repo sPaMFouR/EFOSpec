@@ -81,11 +81,15 @@ class EpochPage:
                 f'<img loading="lazy" src="{url}" alt="{_text(title)}"></button></figure>')
 
     def failure_notice(self, run_dir, item):
+        from .review_handoff import issue_updates
+        update=next((u for u in issue_updates(run_dir) if u['raw']==item.get('path')),None)
         raw = Path(item.get('path', '')).name
         launch = (f'<button type="button" class="review-launch" data-review-url="{_text(review_url(run_dir, raw))}">Open in EFOSpec GUI</button>'
                   if raw else '')
         log = self.download(Path(item['traceback']), 'Error log') if item.get('traceback') else ''
-        return ('<p class="qc-status-bad">'+_text(item.get('code', 'Reduction failed'))
+        current=('<p class="qc-status-bad"><strong>Latest retry:</strong> '+_text(update['summary'])+'</p>'
+                 if update else '')
+        return (current+'<p class="qc-status-bad">'+('Original attempt — ' if update else '')+_text(item.get('code', 'Reduction failed'))
                 +': '+_text(failure_reason(item))+'</p><p>'+_text(recovery_advice(item))+'</p>'
                 +'<p>'+ ' · '.join(filter(None, [launch, log]))+'</p>'
                 +('<details class="review-help"><summary>Desktop launch help</summary><p class="launch-status" role="status"></p><p>Requires EFOSpec on this computer '
@@ -261,6 +265,13 @@ class EpochPage:
                 'unsupported_setup':'The selected reduction route does not support the recorded setup.'}.get(code, items[0].get('reason', items[0].get('error', code)))
             rows.append([_text(code), len(items), _text(targets), _text(detail)])
         content=_table(['Issue', 'Exposures', 'Targets', 'Meaning'], rows) if rows else '<p>No recorded reduction failures.</p>'
+        if run_dir is not None:
+            from .review_handoff import issue_updates
+            updates=issue_updates(run_dir)
+            if updates:
+                latest=''.join('<p class="qc-status-bad"><strong>'+_text(u['object'])+
+                    ' — latest retry:</strong> '+_text(u['summary'])+'</p>' for u in updates)
+                content=latest+'<h3>Original nightly attempts</h3>'+content
         if run_dir is not None:
             if run.get('flux_calibration') == 'same-night':
                 from .sky_quality import explained_sky_failure

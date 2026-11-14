@@ -43,6 +43,12 @@ python scripts/03_report_epoch.py 2026-10-28
 
 Open **`runs/2026-10-28/index.html`**.
 
+Use this main nightly HTML for status and issues. Do not generate separate
+diagnostic HTML pages unless explicitly requested. Show diagnostic plots directly
+in the conversation for aperture/background review; retain their data and
+provenance in dated QC folders. Later retry notes must be hash-bound to the
+selected parent reduction and raw exposure before appearing in the main report.
+
 The opening page embeds lightweight WebP figure previews, so figures also work
 in HTML viewers without access to neighbouring files. Full-resolution figures
 and scientific products remain unchanged. Downloads use the sibling

@@ -5,6 +5,26 @@ import shlex
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 
+def issue_updates(run):
+    """Read explicitly selected follow-up notes bound to this run and raw data."""
+    from .inventory import sha256
+    run=Path(run).resolve();qc=run.parent/'QC'
+    path=qc/'issue-updates.json'
+    if not path.exists():return []
+    record=json.loads(path.read_text());parent_hash=sha256(run/'run.json')
+    if record['parent_sha256']!=parent_hash:raise ValueError('issue updates belong to another reduction')
+    for item in record['updates']:
+        manifest=Path(item['manifest']).resolve()
+        if not manifest.is_relative_to(qc) or sha256(manifest)!=item['manifest_sha256']:
+            raise ValueError('issue update evidence changed or lies outside the revision')
+        evidence=json.loads(manifest.read_text())
+        if (evidence['parent_sha256']!=parent_hash or Path(evidence['parent_run']).resolve()!=run
+                or evidence['raw_sha256']!=item['raw_sha256'] or evidence['target']!=item['object']
+                or sha256(Path(item['raw']))!=item['raw_sha256']):
+            raise ValueError('issue update input binding failed')
+    return record['updates']
+
+
 def review_url(run, raw):
     return 'efospec://review?' + urlencode(dict(run=str(Path(run).resolve()), raw=Path(raw).name))
 
